@@ -1,0 +1,67 @@
+# Import necessary libraries
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+# Load your dataset (replace 'your_dataset.csv' with your actual dataset file)
+# Assuming your dataset has columns: 'image_path' and 'severity'
+# 'image_path' should contain the file paths to the retinal images, and 'severity' should contain severity labels.
+# You may need to adjust this based on your actual dataset structure.
+df = pd.read_csv('your_dataset.csv')
+
+# Split the data into training and testing sets
+train_df, test_df = train_test_split(df, test_size=0.2, random_state=42)
+
+# Create an ImageDataGenerator for data augmentation and normalization
+datagen = ImageDataGenerator(rescale=1./255, shear_range=0.2, zoom_range=0.2, horizontal_flip=True)
+
+# Create a generator for training data
+train_generator = datagen.flow_from_dataframe(
+    dataframe=train_df,
+    x_col="image_path",
+    y_col="severity",
+    target_size=(128, 128),  # adjust size based on your dataset
+    batch_size=32,
+    class_mode='categorical',  # change to 'binary' if it's a binary classification
+    shuffle=True
+)
+
+# Create a generator for testing data
+test_generator = datagen.flow_from_dataframe(
+    dataframe=test_df,
+    x_col="image_path",
+    y_col="severity",
+    target_size=(128, 128),
+    batch_size=32,
+    class_mode='categorical',
+    shuffle=False
+)
+
+# Build a simple CNN model
+model = Sequential()
+model.add(Conv2D(32, (3, 3), input_shape=(128, 128, 3), activation='relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Flatten())
+model.add(Dense(128, activation='relu'))
+model.add(Dense(5, activation='softmax'))  # Adjust the number of classes based on your severity levels
+
+# Compile the model
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Train the model
+model.fit(train_generator, epochs=10, validation_data=test_generator)
+
+# Evaluate the model on the test set
+y_true = test_generator.classes
+y_pred = np.argmax(model.predict(test_generator), axis=1)
+
+# Calculate accuracy and other metrics
+accuracy = accuracy_score(y_true, y_pred)
+classification_report_result = classification_report(y_true, y_pred)
+
+print(f"Accuracy: {accuracy}")
+print("Classification Report:\n", classification_report_result)
